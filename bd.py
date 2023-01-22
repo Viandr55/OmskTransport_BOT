@@ -13,7 +13,7 @@ while True:
             btn1 = types.KeyboardButton(text="/add")
             btn2 = types.KeyboardButton(text="🚫/edit🚫")
             kb.add(btn1, btn2)
-            bot.send_message(message.chat.id, f'Привет, <b>{message.from_user.full_name}</b>\nНажми на кнопку внизу или введи гаражный номер', parse_mode='html', reply_markup=kb)
+            bot.send_message(message.chat.id, f'Привет, <b>{message.from_user.full_name}</b>\nНажми кнопку внизу или введи гаражный номер', parse_mode='html', reply_markup=kb)
             print(message.chat.id)
 
         @bot.message_handler(commands=['i<3u'])
