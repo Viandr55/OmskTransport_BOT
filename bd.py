@@ -3,6 +3,7 @@ import sqlite3
 from telebot import types
 from config import Token
 from config import love
+from config import allowed_users
 
 bot = telebot.TeleBot(Token())
 while True:
@@ -74,7 +75,7 @@ while True:
                     cursor.execute(f"INSERT INTO bus_id VALUES (?, ?, ?)", sp)
                     connect.commit()
                     bot.send_message(message.chat.id, f'Гаражный номер <b>{gid}</b> успешно добавлен\nДля проверки введи {gid}', parse_mode='html')
-                    bot.send_message('-805417506', f'Добавлена запись: {gid}; {gtype}; {gcomment}')
+                    bot.send_message('-805417506', f'Добавлена запись: {gid}; {gtype}; {gcomment}\n@{message.from_user.username}')
             else:
                 bot.send_message(message.chat.id, f'Ты ввёл некорректный гаражный номер.\nВведи /add для добавления новой записи')
 
