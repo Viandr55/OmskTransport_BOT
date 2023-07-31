@@ -3,31 +3,23 @@ import sqlite3
 from telebot import types
 from config import Token
 from config import love
-from config import allowed_users
 
 bot = telebot.TeleBot(Token())
 while True:
     try:
         @bot.message_handler(commands=['start', 'help'])
         def start(message):
-            if message.from_user.id not in allowed_users():
-               bot.send_message(message.chat.id, 'Unauthorized access')
-               return
             kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
             btn1 = types.KeyboardButton(text="/add")
             btn2 = types.KeyboardButton(text="🚫/edit🚫")
             kb.add(btn1, btn2)
-            bot.send_message(message.chat.id, f'Привет, <b>{message.from_user.full_name}</b>\nНажми кнопку внизу или введи гаражный номер\n', parse_mode='html', reply_markup=kb)
+            bot.send_message(message.chat.id, f'Привет, <b>{message.from_user.full_name}</b>\nНажми кнопку внизу или введи гаражный номер', parse_mode='html', reply_markup=kb)
             print(message.chat.id)
 
         @bot.message_handler(commands=['i<3u'])
         def ilu(message):
-            if message.from_user.id not in allowed_users():
-               bot.send_message(message.chat.id, 'Unauthorized access')
-               return
             love()
 
-        
         @bot.message_handler(commands=['search', 'поиск'])
         def gid_request(message):
             gid_req = bot.reply_to(message, 'Введи гаражный номер')
@@ -56,9 +48,6 @@ while True:
 
         @bot.message_handler(commands=['add', 'добавить'])
         def add(message):
-            if message.from_user.id not in allowed_users():
-               bot.send_message(message.chat.id, 'Unauthorized access')
-               return
             gid_req = bot.reply_to(message, f'Через пробел введи гаражный номер, тип и комментарий\n(666 Лиаз Какой-нибудь комментарий)')
             bot.register_next_step_handler(gid_req, check_gid)
         
@@ -85,7 +74,7 @@ while True:
                     cursor.execute(f"INSERT INTO bus_id VALUES (?, ?, ?)", sp)
                     connect.commit()
                     bot.send_message(message.chat.id, f'Гаражный номер <b>{gid}</b> успешно добавлен\nДля проверки введи {gid}', parse_mode='html')
-                    bot.send_message('-805417506', f'Добавлена запись: {gid}; {gtype}; {gcomment}\n@{message.from_user.username}')
+                    bot.send_message('-805417506', f'Добавлена запись: {gid}; {gtype}; {gcomment}')
             else:
                 bot.send_message(message.chat.id, f'Ты ввёл некорректный гаражный номер.\nВведи /add для добавления новой записи')
 
@@ -93,21 +82,12 @@ while True:
         def edit(message):
             bot.send_message(message.chat.id, 'Функция редактирования ещё в разработке')
 
-        @bot.message_handler(commands=['print_user_id'])
-        def print_user_id(message):
-            bot.send_message(message.chat.id, f'{message.from_user.id}')
-
         @bot.message_handler(content_types=['text'])
         def text(message):
-            if message.from_user.id not in allowed_users():
-               bot.send_message(message.chat.id, 'Unauthorized access')
-               return
             if message.text.isdigit():
                 search(message)
             else:
                 bot.send_message(message.chat.id, 'Я не знаю что ты ввёл')
-
-        
 
         
         bot.polling(none_stop=True, interval=0)

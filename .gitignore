@@ -2,3 +2,6 @@
 config.py
 __pycache__/
 help
+.vscode/
+*_bckp
+*_backup
