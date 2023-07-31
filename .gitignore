@@ -3,5 +3,5 @@ config.py
 __pycache__/
 help
 .vscode/
-*_bckp
-*_backup
+bd.py_bckp
+ts.db.backup
