@@ -15,9 +15,9 @@ while True:
                return
             kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
             btn1 = types.KeyboardButton(text="/add")
-            btn2 = types.KeyboardButton(text="🚫/edit🚫")
+            btn2 = types.KeyboardButton(text="/edit")
             kb.add(btn1, btn2)
-            bot.send_message(message.chat.id, f'Привет, <b>{message.from_user.full_name}</b>\nНажми кнопку внизу или введи гаражный номер\n', parse_mode='html', reply_markup=kb)
+            bot.send_message(message.chat.id, f'Привет, <b>{message.from_user.full_name}</b> 👋\n\nНажми кнопку внизу или введи гаражный номер\n', parse_mode='html', reply_markup=kb)
             print(message.chat.id)
 
         @bot.message_handler(commands=['i<3u'])
@@ -28,10 +28,10 @@ while True:
             love()
 
         
-        @bot.message_handler(commands=['search', 'поиск'])
+        @bot.message_handler(commands=['search'])
         def gid_request(message):
-            gid_req = bot.reply_to(message, 'Введи гаражный номер')
-            bot.register_next_step_handler(gid_req, search)
+            bot.send_message(message.chat.id, 'Введи гаражный номер для поиска')
+            bot.register_next_step_handler(message, search)
 
         def search(message):
             connect = sqlite3.connect('ts.db')
@@ -40,6 +40,7 @@ while True:
             cursor.execute(f"SELECT EXISTS(SELECT * FROM bus_id where id = {int(poisk)})")
             if cursor.fetchone()[0] == 0:
                 bot.send_message(message.chat.id, f'Гаражного номера <b>{poisk}</b> у меня пока нет', parse_mode='html')
+                start(message)
             else:
                 pls = cursor.execute(f"SELECT type, comment FROM bus_id WHERE id = {int(poisk)}")
                 tip = pls.fetchall()[0][0]
@@ -54,44 +55,145 @@ while True:
                 bot.send_message(message.chat.id, f'<b>Гаражный номер:</b> {poisk}\n<b>Тип:</b> {tip}\n<b>Комментарий:</b> {comm}', parse_mode='html')
                 connect.commit()
 
-        @bot.message_handler(commands=['add', 'добавить'])
+        @bot.message_handler(commands=['add'])
         def add(message):
             if message.from_user.id not in allowed_users():
                bot.send_message(message.chat.id, 'Unauthorized access')
                return
-            gid_req = bot.reply_to(message, f'Через пробел введи гаражный номер, тип и комментарий\n(666 Лиаз Какой-нибудь комментарий)')
-            bot.register_next_step_handler(gid_req, check_gid)
+            kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
+            cancel = types.KeyboardButton(text="Отмена")
+            kb.add(cancel)
+            bot.send_message(message.chat.id, f'Через пробел введи гаражный номер, тип и комментарий\n\nПример: 666 Лиаз Какой-нибудь комментарий', parse_mode='html', reply_markup=kb)
+            bot.register_next_step_handler(message, check_gid)
         
         def check_gid(message):
-            sp = message.text.split(' ')
-            if sp[0].isdigit():
-                gid = int(sp[0])
-                if len(sp) >= 2:
-                    gtype = sp[1]
-                else: 
-                    bot.send_message(message.chat.id, 'Без типа создать запись нельзя.\nВведи /add для добавления новой записи')
-                    pass
-                if len(sp) >= 3:
-                    gcomment = ' '.join(sp[2:])
-                else:
-                    gcomment = ''
-                connect = sqlite3.connect('ts.db')
-                cursor = connect.cursor()
-                cursor.execute(f"SELECT EXISTS(SELECT * FROM bus_id where id = {gid})")
-                if cursor.fetchone()[0] == 1:
-                    bot.send_message(message.chat.id, f'Гаражный номер <b>{gid}</b> уже есть в БД.\nВведи /add для добавления новой записи', parse_mode='html')
-                else:
-                    sp = (gid, gtype, gcomment)
-                    cursor.execute(f"INSERT INTO bus_id VALUES (?, ?, ?)", sp)
-                    connect.commit()
-                    bot.send_message(message.chat.id, f'Гаражный номер <b>{gid}</b> успешно добавлен\nДля проверки введи {gid}', parse_mode='html')
-                    bot.send_message('-805417506', f'Добавлена запись: {gid}; {gtype}; {gcomment}\n@{message.from_user.username}')
+            added_id = message.text.lower()
+            if added_id == 'отмена':
+                start(message)
             else:
-                bot.send_message(message.chat.id, f'Ты ввёл некорректный гаражный номер.\nВведи /add для добавления новой записи')
+                sp = message.text.split(' ')
+                if sp[0].isdigit():
+                    gid = int(sp[0])
+                    if len(sp) >= 2:
+                        gtype = sp[1]
+                    else: 
+                        bot.send_message(message.chat.id, 'Без типа создать запись нельзя\n\nВведи /add для добавления новой записи')
+                        start(message)
+                    if len(sp) >= 3:
+                        gcomment = ' '.join(sp[2:])
+                    else:
+                        gcomment = ''
+                    connect = sqlite3.connect('ts.db')
+                    cursor = connect.cursor()
+                    cursor.execute(f"SELECT EXISTS(SELECT * FROM bus_id where id = {gid})")
+                    if cursor.fetchone()[0] == 1:
+                        bot.send_message(message.chat.id, f'Гаражный номер <b>{gid}</b> уже есть в БД', parse_mode='html')
+                        start(message)
+                    else:
+                        sp = (gid, gtype, gcomment)
+                        cursor.execute(f"INSERT INTO bus_id VALUES (?, ?, ?)", sp)
+                        connect.commit()
+                        bot.send_message('-805417506', f'Добавлена запись: {gid}; {gtype}; {gcomment}\n@{message.from_user.username}')
+                        show_added_entry(message, gid, gtype, gcomment)
+                else:
+                    bot.send_message(message.chat.id, f'Ты ввёл некорректный гаражный номер')
+                    start(message)
+
+        def show_added_entry(message, gid, gtype, gcomment):
+            bot.send_message(message.chat.id, f'<b>Добавленная запись</b>\n\n<b>Гаражный номер:</b> {gid}\n<b>Тип:</b> {gtype}\n<b>Комментарий:</b> {gcomment}', parse_mode='html')
+            start(message)
 
         @bot.message_handler(commands=['edit'])
         def edit(message):
-            bot.send_message(message.chat.id, 'Функция редактирования ещё в разработке')
+            if message.from_user.id not in allowed_users():
+               bot.send_message(message.chat.id, 'Unauthorized access')
+               return
+            kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
+            cancel = types.KeyboardButton(text="Отмена")
+            kb.add(cancel)
+            bot.send_message(message.chat.id, 'Введи гаражный номер для редактирования или нажми "Отмена"', reply_markup=kb)
+            bot.register_next_step_handler(message, select_entry_to_edit)
+
+        def select_entry_to_edit(message):
+            try:
+                selected_id = message.text.lower()
+                if selected_id == 'отмена':
+                    start(message)
+                else:
+                    gid = int(message.text)
+                    connect = sqlite3.connect('ts.db')
+                    cursor = connect.cursor()
+                    cursor.execute(f"SELECT EXISTS(SELECT * FROM bus_id where id = {gid})")
+                    if cursor.fetchone()[0] == 0:
+                        bot.send_message(message.chat.id, f'Гаражного номера <b>{gid}</b> у меня пока нет', parse_mode='html')
+                        start(message)
+
+                    kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+                    btn1 = types.KeyboardButton(text="Тип")
+                    btn2 = types.KeyboardButton(text="Комментарий")
+                    btn3 = types.KeyboardButton(text="Отмена")
+                    kb.add(btn1, btn2, btn3)
+                    bot.send_message(message.chat.id, 'Выбери поле для редактирования', reply_markup=kb)
+                    bot.register_next_step_handler(message, edit_field, gid)
+            except ValueError:
+                bot.send_message(message.chat.id, 'Некорректный гаражный номер\nПопробуй снова')
+
+        def edit_field(message, gid):
+            selected_field = message.text.lower()
+
+            if selected_field == 'отмена':
+                start(message)
+            elif selected_field == 'тип':
+                show_current_value_and_request_new_value(message, gid, 'type', 'Тип')
+            elif selected_field == 'комментарий':
+                show_current_value_and_request_new_value(message, gid, 'comment', 'Комментарий')
+            else:
+                bot.send_message(message.chat.id, 'Выбор некорректный\nПопробуй снова')
+
+        def show_current_value_and_request_new_value(message, gid, field_name, field_display_name):
+            connect = sqlite3.connect('ts.db')
+            cursor = connect.cursor()
+            cursor.execute(f"SELECT {field_name} FROM bus_id WHERE id = {gid}")
+            current_value = cursor.fetchone()[0]
+            
+            kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+            btn1 = types.KeyboardButton(text="Назад")
+            kb.add(btn1)
+            if field_display_name == "Тип":
+                bot.send_message(message.chat.id, f'Текущее значение типа: {current_value}\nВведи новое значение или нажми "Назад"', reply_markup=kb)
+            else:
+                bot.send_message(message.chat.id, f'Текущее значение комментария: <code>{current_value}</code>\nВведи новое значение или нажми "Назад"', parse_mode='html', reply_markup=kb)
+            bot.register_next_step_handler(message, update_field, gid, field_name)
+
+        def update_field(message, gid, field_name):
+            new_value = message.text
+
+            if new_value.lower() == 'назад':
+                kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+                btn1 = types.KeyboardButton(text="Тип")
+                btn2 = types.KeyboardButton(text="Комментарий")
+                btn3 = types.KeyboardButton(text="Отмена")
+                kb.add(btn1, btn2, btn3)
+                bot.send_message(message.chat.id, 'Выбери поле для редактирования', reply_markup=kb)
+                bot.register_next_step_handler(message, edit_field, gid)
+            else:
+                connect = sqlite3.connect('ts.db')
+                cursor = connect.cursor()
+                cursor.execute(f"UPDATE bus_id SET {field_name} = ? WHERE id = ?", (new_value, gid))
+                connect.commit()
+                show_updated_entry(message, gid)
+                start(message)
+
+        def show_updated_entry(message, gid):
+            connect = sqlite3.connect('ts.db')
+            cursor = connect.cursor()
+            cursor.execute(f"SELECT type, comment FROM bus_id WHERE id = {gid}")
+            entry = cursor.fetchone()
+            updated_type = entry[0]
+            updated_comment = entry[1]
+
+            bot.send_message(message.chat.id, f'<b>Обновленная запись</b>\n\n<b>Гаражный номер:</b> {gid}\n<b>Тип:</b> {updated_type}\n<b>Комментарий:</b> {updated_comment}', parse_mode='html')
+
 
         @bot.message_handler(commands=['print_user_id'])
         def print_user_id(message):
@@ -105,9 +207,8 @@ while True:
             if message.text.isdigit():
                 search(message)
             else:
-                bot.send_message(message.chat.id, 'Я не знаю что ты ввёл')
-
-        
+                bot.send_message(message.chat.id, 'Я не знаю что ты ввел')
+                start(message)
 
         
         bot.polling(none_stop=True, interval=0)
