@@ -13,11 +13,12 @@ while True:
             if message.from_user.id not in allowed_users():
                bot.send_message(message.chat.id, 'Unauthorized access')
                return
-            kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+            kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
             btn1 = types.KeyboardButton(text="/add")
             btn2 = types.KeyboardButton(text="/edit")
-            kb.add(btn1, btn2)
-            bot.send_message(message.chat.id, f'Привет, <b>{message.from_user.full_name}</b> 👋\n\nНажми кнопку внизу или введи гаражный номер\n', parse_mode='html', reply_markup=kb)
+            btn3 = types.KeyboardButton(text="/delete")
+            kb.add(btn1, btn2, btn3)
+            bot.send_message(message.chat.id, f'Привет, <b>{message.from_user.full_name}</b> 👋\n\nНажми кнопку внизу или введи гаражный номер', parse_mode='html', reply_markup=kb)
             print(message.chat.id)
 
         @bot.message_handler(commands=['i<3u'])
@@ -47,9 +48,9 @@ while True:
                 pls = cursor.execute(f"SELECT type, comment FROM bus_id WHERE id = {int(poisk)}")
                 comm = pls.fetchall()[0][1]
 
-                if tip == None:
+                if tip is None:
                     tip = ''
-                if comm == None:
+                if comm is None:
                     comm = ''
                 
                 bot.send_message(message.chat.id, f'<b>Гаражный номер:</b> {poisk}\n<b>Тип:</b> {tip}\n<b>Комментарий:</b> {comm}', parse_mode='html')
@@ -120,21 +121,23 @@ while True:
                 if selected_id == 'отмена':
                     start(message)
                 else:
-                    gid = int(message.text)
                     connect = sqlite3.connect('ts.db')
                     cursor = connect.cursor()
-                    cursor.execute(f"SELECT EXISTS(SELECT * FROM bus_id where id = {gid})")
-                    if cursor.fetchone()[0] == 0:
-                        bot.send_message(message.chat.id, f'Гаражного номера <b>{gid}</b> у меня пока нет', parse_mode='html')
+                    cursor.execute(f"SELECT * FROM bus_id where id = {selected_id}")
+                    entry = cursor.fetchone()
+                    if not entry:
+                        bot.send_message(message.chat.id, f'Гаражного номера <b>{selected_id}</b> у меня пока нет', parse_mode='html')
                         start(message)
-
-                    kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-                    btn1 = types.KeyboardButton(text="Тип")
-                    btn2 = types.KeyboardButton(text="Комментарий")
-                    btn3 = types.KeyboardButton(text="Отмена")
-                    kb.add(btn1, btn2, btn3)
-                    bot.send_message(message.chat.id, 'Выбери поле для редактирования', reply_markup=kb)
-                    bot.register_next_step_handler(message, edit_field, gid)
+                    else:
+                        kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+                        btn1 = types.KeyboardButton(text="Тип")
+                        btn2 = types.KeyboardButton(text="Комментарий")
+                        btn3 = types.KeyboardButton(text="Отмена")
+                        kb.add(btn1, btn2, btn3)
+                        selected_type = entry[1]
+                        selected_comment = entry[2]
+                        bot.send_message(message.chat.id, f'Выбери поле для редактирования\n\n<b>Гаражный номер:</b> {selected_id}\n<b>Тип:</b> {selected_type}\n<b>Комментарий:</b> {selected_comment}', parse_mode='html', reply_markup=kb)
+                        bot.register_next_step_handler(message, edit_field, selected_id)
             except ValueError:
                 bot.send_message(message.chat.id, 'Некорректный гаражный номер\nПопробуй снова')
 
@@ -195,7 +198,64 @@ while True:
             bot.send_message(message.chat.id, f'<b>Обновленная запись</b>\n\n<b>Гаражный номер:</b> {gid}\n<b>Тип:</b> {updated_type}\n<b>Комментарий:</b> {updated_comment}', parse_mode='html')
 
 
-        @bot.message_handler(commands=['print_user_id'])
+        @bot.message_handler(commands=['delete'])
+        def delete(message):
+            if message.from_user.id not in allowed_users():
+                bot.send_message(message.chat.id, 'Unauthorized access')
+                return
+            kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
+            cancel = types.KeyboardButton(text="Отмена")
+            kb.add(cancel)
+            bot.send_message(message.chat.id, 'Введи гаражный номер для удаления или нажми "Отмена"', reply_markup=kb)
+            bot.register_next_step_handler(message, confirm_delete)
+
+        def confirm_delete(message):
+            try:
+                if message.text.lower() == 'отмена':
+                    start(message)
+                else:
+                    selected_id = int(message.text)
+                    connect = sqlite3.connect('ts.db')
+                    cursor = connect.cursor()
+                    cursor.execute(f"SELECT * FROM bus_id where id = {selected_id}")
+                    entry = cursor.fetchone()
+                    if not entry:
+                        bot.send_message(message.chat.id, f'Гаражного номера <b>{selected_id}</b> у меня пока нет', parse_mode='html')
+                        start(message)
+                    else:
+                        kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+                        confirm_btn = types.KeyboardButton(text="Удалить")
+                        back_btn = types.KeyboardButton(text="Назад")
+                        cancel_btn = types.KeyboardButton(text="Отмена")
+                        kb.add(confirm_btn, back_btn, cancel_btn)
+                        selected_type = entry[1]
+                        selected_comment = entry[2]
+                        bot.send_message(message.chat.id, f'Точно хочешь удалить запись?\n\n<b>Гаражный номер:</b> {selected_id}\n<b>Тип:</b> {selected_type}\n<b>Комментарий:</b> {selected_comment}', parse_mode='html', reply_markup=kb)
+                        bot.register_next_step_handler(message, execute_delete, selected_id)
+            except ValueError:
+                bot.send_message(message.chat.id, 'Некорректный гаражный номер')
+
+        def execute_delete(message, selected_id):
+            if message.text.lower() == 'удалить':
+                connect = sqlite3.connect('ts.db')
+                cursor = connect.cursor()
+                cursor.execute(f"SELECT type, comment FROM bus_id WHERE id = {selected_id}")
+                entry = cursor.fetchone()
+                selected_type = entry[0]
+                selected_comment = entry[1]
+
+                cursor.execute(f"DELETE FROM bus_id WHERE id = ?", (selected_id,))
+                connect.commit()
+                bot.send_message('-805417506', f'Удалена запись: {selected_id}; {selected_type}; {selected_comment}\n@{message.from_user.username}')
+                bot.send_message(message.chat.id, f'Гаражный номер <b>{selected_id}</b> успешно удален', parse_mode='html')
+                start(message)
+            elif message.text.lower() == 'назад':
+                delete(message)
+            else:
+                start(message)
+
+
+        @bot.message_handler(commands=['id'])
         def print_user_id(message):
             bot.send_message(message.chat.id, f'{message.from_user.id}')
 
