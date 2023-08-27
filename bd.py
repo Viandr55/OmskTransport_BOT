@@ -22,7 +22,7 @@ def start(message):
     edit = types.KeyboardButton(text="/edit")
     delete = types.KeyboardButton(text="/delete")
     kb.add(add, edit, delete)
-    bot.send_message(message.chat.id, f'Привет, <b>{message.from_user.full_name}</b> 👋\n\nНажми кнопку внизу или введи гаражный номер', parse_mode='html', reply_markup=kb)
+    bot.send_message(message.chat.id, f'Привет, <b>{message.from_user.full_name}</b> 👋\n\nНажми кнопочку внизу или введи гаражный номер', parse_mode='html', reply_markup=kb)
     print("https://t.me/"+message.from_user.username)
 
 @bot.message_handler(commands=['i<3u'])
@@ -204,11 +204,12 @@ def select_entry_to_edit(message, selected_id=None):
                 bot.send_message(message.chat.id, f'Гаражного номера <b>{selected_id}</b> у меня пока нет', parse_mode='html')
                 start(message)
             else:
-                kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-                btn1 = types.KeyboardButton(text="Тип")
-                btn2 = types.KeyboardButton(text="Комментарий")
-                btn3 = types.KeyboardButton(text="Отмена")
-                kb.add(btn1, btn2, btn3)
+                kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
+                picktype = types.KeyboardButton(text="Тип")
+                pickcomment = types.KeyboardButton(text="Комментарий")
+                cancel = types.KeyboardButton(text="Отмена")
+                back = types.KeyboardButton(text="Назад")
+                kb.add(picktype, back, pickcomment, cancel)
                 selected_type = entry[1]
                 selected_comment = entry[2]
                 bot.send_message(message.chat.id, f'Выбери поле для редактирования\n\n<b>Гаражный номер:</b> {selected_id}\n<b>Тип:</b> {selected_type}\n<b>Комментарий:</b> {selected_comment}', parse_mode='html', reply_markup=kb)
@@ -218,9 +219,10 @@ def select_entry_to_edit(message, selected_id=None):
 
 def edit_field(message, gid):
     selected_field = message.text.lower()
-
     if selected_field == 'отмена':
         start(message)
+    elif selected_field == 'назад':
+        edit(message)
     elif selected_field == 'тип':
         show_current_value_and_request_new_value(message, gid, 'type', 'Тип')
     elif selected_field == 'комментарий':
@@ -247,13 +249,7 @@ def show_current_value_and_request_new_value(message, gid, field_name, field_dis
 def update_field(message, gid, field_name):
     new_value = message.text
     if new_value.lower() == 'назад':
-        kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-        picktype = types.KeyboardButton(text="Тип")
-        pickcomment = types.KeyboardButton(text="Комментарий")
-        cancel = types.KeyboardButton(text="Отмена")
-        kb.add(picktype, pickcomment, cancel)
-        bot.send_message(message.chat.id, 'Выбери поле для редактирования', reply_markup=kb)
-        bot.register_next_step_handler(message, edit_field, gid)
+        select_entry_to_edit(message, gid)
     elif new_value.lower() == 'отмена':
         start(message)
     else:
