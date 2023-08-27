@@ -14,6 +14,7 @@ def check_access(user_id):
 @bot.message_handler(commands=['start', 'help'])
 def start(message):
     if not check_access(message.from_user.id):
+        print("https://t.me/"+message.from_user.username)
         bot.send_message(message.chat.id, 'Unauthorized access')
         return
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
@@ -22,7 +23,7 @@ def start(message):
     delete = types.KeyboardButton(text="/delete")
     kb.add(add, edit, delete)
     bot.send_message(message.chat.id, f'Привет, <b>{message.from_user.full_name}</b> 👋\n\nНажми кнопку внизу или введи гаражный номер', parse_mode='html', reply_markup=kb)
-    print(message.chat.id)
+    print("https://t.me/"+message.from_user.username)
 
 @bot.message_handler(commands=['i<3u'])
 def ilu(message):
