@@ -42,8 +42,10 @@ while True:
             gid = int(message.text)
             cursor.execute(f"SELECT EXISTS(SELECT * FROM bus_id where id = {int(gid)})")
             if cursor.fetchone()[0] == 0:
-                bot.send_message(message.chat.id, f'Гаражного номера <b>{gid}</b> у меня пока нет', parse_mode='html')
-                start(message)
+                markup = types.InlineKeyboardMarkup()
+                button = types.InlineKeyboardButton(text="Добавить запись", callback_data=f"add_{gid}")
+                markup.add(button)
+                bot.send_message(message.chat.id, f'Гаражного номера <b>{gid}</b> у меня пока нет', parse_mode='html', reply_markup=markup)
             else:
                 cursor.execute(f"SELECT type, comment FROM bus_id WHERE id = {int(gid)}")
                 entry = cursor.fetchone()
@@ -57,6 +59,11 @@ while True:
                 
                 bot.send_message(message.chat.id, f'<b>Гаражный номер:</b> {gid}\n<b>Тип:</b> {gtype}\n<b>Комментарий:</b> {gcomment}', parse_mode='html')
                 connect.commit()
+
+        @bot.callback_query_handler(func=lambda call: call.data.startswith("add_"))
+        def handle_add_callback(call):
+            gid = call.data.split("_")[1]
+            add_type(call.message, gid)
 
         #Функция добавления записи
         @bot.message_handler(commands=['add'])
