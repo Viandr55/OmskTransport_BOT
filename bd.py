@@ -59,13 +59,29 @@ def search(message):
         gcomment = entry[1]
         if gcomment is None:
             gcomment = ''
-        bot.send_message(message.chat.id, f'<b>Гаражный номер:</b> {gid}\n<b>Тип:</b> {gtype}\n<b>Комментарий:</b> {gcomment}', parse_mode='html')
+        markup = types.InlineKeyboardMarkup()
+        edit = types.InlineKeyboardButton(text="Редактировать", callback_data=f"edit_{gid}")
+        delete = types.InlineKeyboardButton(text="Удалить", callback_data=f"delete_{gid}")
+        markup.add(edit, delete)
+        bot.send_message(message.chat.id, f'<b>Гаражный номер:</b> {gid}\n<b>Тип:</b> {gtype}\n<b>Комментарий:</b> {gcomment}', parse_mode='html', reply_markup=markup)
         connect.commit()
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("add_"))
 def handle_add_callback(call):
     gid = call.data.split("_")[1]
     add_type(call.message, gid)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("edit_"))
+def handle_edit_callback(call):
+    gid = call.data.split("_")[1]
+    bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
+    select_entry_to_edit(call.message, gid)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("delete_"))
+def handle_delete_callback(call):
+    gid = call.data.split("_")[1]
+    bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
+    confirm_delete(call.message, gid)
 
 
 #Функция добавления записи
@@ -171,9 +187,12 @@ def edit(message):
     bot.send_message(message.chat.id, 'Введи гаражный номер для редактирования или нажми "Отмена"', reply_markup=kb)
     bot.register_next_step_handler(message, select_entry_to_edit)
 
-def select_entry_to_edit(message):
+def select_entry_to_edit(message, selected_id=None):
     try:
-        selected_id = message.text.lower()
+        if selected_id is None:
+            selected_id = message.text.lower()
+        else:
+            selected_id = selected_id
         if selected_id == 'отмена':
             start(message)
         else:
@@ -215,9 +234,10 @@ def show_current_value_and_request_new_value(message, gid, field_name, field_dis
     cursor.execute(f"SELECT {field_name} FROM bus_id WHERE id = {gid}")
     current_value = cursor.fetchone()[0]
     
-    kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    btn1 = types.KeyboardButton(text="Назад")
-    kb.add(btn1)
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
+    back = types.KeyboardButton(text="Назад")
+    cancel = types.KeyboardButton(text="Отмена")
+    kb.add(back, cancel)
     if field_display_name == "Тип":
         bot.send_message(message.chat.id, f'Текущее значение типа: {current_value}\nВведи новое значение или нажми "Назад"', reply_markup=kb)
     else:
@@ -228,12 +248,14 @@ def update_field(message, gid, field_name):
     new_value = message.text
     if new_value.lower() == 'назад':
         kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-        btn1 = types.KeyboardButton(text="Тип")
-        btn2 = types.KeyboardButton(text="Комментарий")
-        btn3 = types.KeyboardButton(text="Отмена")
-        kb.add(btn1, btn2, btn3)
+        picktype = types.KeyboardButton(text="Тип")
+        pickcomment = types.KeyboardButton(text="Комментарий")
+        cancel = types.KeyboardButton(text="Отмена")
+        kb.add(picktype, pickcomment, cancel)
         bot.send_message(message.chat.id, 'Выбери поле для редактирования', reply_markup=kb)
         bot.register_next_step_handler(message, edit_field, gid)
+    elif new_value.lower() == 'отмена':
+        start(message)
     else:
         connect = sqlite3.connect('ts.db')
         cursor = connect.cursor()
@@ -277,12 +299,15 @@ def delete(message):
     bot.send_message(message.chat.id, 'Введи гаражный номер для удаления или нажми "Отмена"', reply_markup=kb)
     bot.register_next_step_handler(message, confirm_delete)
 
-def confirm_delete(message):
+def confirm_delete(message, selected_id=None):
     try:
         if message.text.lower() == 'отмена':
             start(message)
         else:
-            selected_id = int(message.text)
+            if selected_id is None:
+                selected_id = int(message.text)
+            else:
+                selected_id = selected_id
             connect = sqlite3.connect('ts.db')
             cursor = connect.cursor()
             cursor.execute(f"SELECT * FROM bus_id where id = {selected_id}")
