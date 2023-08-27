@@ -2,6 +2,7 @@ import telebot
 import sqlite3
 from telebot import types
 from config import Token, love, allowed_users
+import re
 
 bot = telebot.TeleBot(Token())
 
@@ -18,11 +19,11 @@ def start(message):
         bot.send_message(message.chat.id, 'Unauthorized access')
         return
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
-    add = types.KeyboardButton(text="/add")
-    edit = types.KeyboardButton(text="/edit")
-    delete = types.KeyboardButton(text="/delete")
+    add = types.KeyboardButton(text="Добавить")
+    edit = types.KeyboardButton(text="Редактировать")
+    delete = types.KeyboardButton(text="Удалить")
     kb.add(add, edit, delete)
-    bot.send_message(message.chat.id, f'Привет, <b>{message.from_user.full_name}</b> 👋\n\nНажми кнопочку внизу или введи гаражный номер', parse_mode='html', reply_markup=kb)
+    bot.send_message(message.chat.id, f'Привет, <b>{message.from_user.full_name}</b> 👋\n\nНажми кнопочку снизу или введи гаражный номер', parse_mode='html', reply_markup=kb)
     print("https://t.me/"+message.from_user.username)
 
 @bot.message_handler(commands=['i<3u'])
@@ -69,6 +70,7 @@ def search(message):
 @bot.callback_query_handler(func=lambda call: call.data.startswith("add_"))
 def handle_add_callback(call):
     gid = call.data.split("_")[1]
+    bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
     add_type(call.message, gid)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("edit_"))
@@ -86,6 +88,7 @@ def handle_delete_callback(call):
 
 #Функция добавления записи
 @bot.message_handler(commands=['add'])
+@bot.message_handler(func=lambda message: message.text.lower() == 'добавить')
 def add(message):
     if not check_access(message.from_user.id):
         bot.send_message(message.chat.id, 'Unauthorized access')
@@ -111,6 +114,8 @@ def add_type(message, gid=None):
                 entry = cursor.fetchone()
                 gtype = entry[0]
                 gcomment = entry[1]
+                if gcomment == None:
+                    gcomment = ''
                 bot.send_message(message.chat.id, f'Гаражный номер <b>{gid}</b> уже есть в БД\n\n<b>Гаражный номер:</b> {gid}\n<b>Тип:</b> {gtype}\n<b>Комментарий:</b> {gcomment}', parse_mode='html')
                 start(message)
                 return
@@ -177,6 +182,7 @@ def send_added_notification(gid, gtype, gcomment, username):
 
 #Функция редактирования записи
 @bot.message_handler(commands=['edit'])
+@bot.message_handler(func=lambda message: message.text.lower() == 'редактировать')
 def edit(message):
     if not check_access(message.from_user.id):
         bot.send_message(message.chat.id, 'Unauthorized access')
@@ -184,7 +190,7 @@ def edit(message):
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
     cancel = types.KeyboardButton(text="Отмена")
     kb.add(cancel)
-    bot.send_message(message.chat.id, 'Введи гаражный номер для редактирования или нажми "Отмена"', reply_markup=kb)
+    bot.send_message(message.chat.id, 'Введи гаражный номер для редактирования', reply_markup=kb)
     bot.register_next_step_handler(message, select_entry_to_edit)
 
 def select_entry_to_edit(message, selected_id=None):
@@ -212,6 +218,8 @@ def select_entry_to_edit(message, selected_id=None):
                 kb.add(picktype, back, pickcomment, cancel)
                 selected_type = entry[1]
                 selected_comment = entry[2]
+                if selected_comment == None:
+                    selected_comment = ''
                 bot.send_message(message.chat.id, f'Выбери поле для редактирования\n\n<b>Гаражный номер:</b> {selected_id}\n<b>Тип:</b> {selected_type}\n<b>Комментарий:</b> {selected_comment}', parse_mode='html', reply_markup=kb)
                 bot.register_next_step_handler(message, edit_field, selected_id)
     except ValueError:
@@ -228,14 +236,16 @@ def edit_field(message, gid):
     elif selected_field == 'комментарий':
         show_current_value_and_request_new_value(message, gid, 'comment', 'Комментарий')
     else:
-        bot.send_message(message.chat.id, 'Выбор некорректный\nПопробуй снова')
+        bot.send_message(message.chat.id, 'Выбор некорректный')
+        select_entry_to_edit(message, gid)
 
 def show_current_value_and_request_new_value(message, gid, field_name, field_display_name):
     connect = sqlite3.connect('ts.db')
     cursor = connect.cursor()
     cursor.execute(f"SELECT {field_name} FROM bus_id WHERE id = {gid}")
     current_value = cursor.fetchone()[0]
-    
+    if current_value == None:
+        current_value = ''
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
     back = types.KeyboardButton(text="Назад")
     cancel = types.KeyboardButton(text="Отмена")
@@ -270,7 +280,8 @@ def show_updated_entry(message, gid):
     entry = cursor.fetchone()
     updated_type = entry[0]
     updated_comment = entry[1]
-
+    if updated_comment == None:
+        updated_comment = ''
     bot.send_message(message.chat.id, f'<b>Измененная запись</b>\n\n<b>Гаражный номер:</b> {gid}\n<b>Тип:</b> {updated_type}\n<b>Комментарий:</b> {updated_comment}', parse_mode='html')
 
 def send_edit_notification(gid, field_name, previous_value, new_value, username):
@@ -285,6 +296,7 @@ def send_edit_notification(gid, field_name, previous_value, new_value, username)
 
 #Функция удаления записи
 @bot.message_handler(commands=['delete'])
+@bot.message_handler(func=lambda message: message.text.lower() == 'удалить')
 def delete(message):
     if not check_access(message.from_user.id):
         bot.send_message(message.chat.id, 'Unauthorized access')
@@ -292,7 +304,7 @@ def delete(message):
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
     cancel = types.KeyboardButton(text="Отмена")
     kb.add(cancel)
-    bot.send_message(message.chat.id, 'Введи гаражный номер для удаления или нажми "Отмена"', reply_markup=kb)
+    bot.send_message(message.chat.id, 'Введи гаражный номер для удаления', reply_markup=kb)
     bot.register_next_step_handler(message, confirm_delete)
 
 def confirm_delete(message, selected_id=None):
@@ -319,6 +331,8 @@ def confirm_delete(message, selected_id=None):
                 kb.add(confirm_btn, back_btn, cancel_btn)
                 selected_type = entry[1]
                 selected_comment = entry[2]
+                if selected_comment == None:
+                    selected_comment = ''
                 bot.send_message(message.chat.id, f'Точно хочешь удалить запись?\n\n<b>Гаражный номер:</b> {selected_id}\n<b>Тип:</b> {selected_type}\n<b>Комментарий:</b> {selected_comment}', parse_mode='html', reply_markup=kb)
                 bot.register_next_step_handler(message, execute_delete, selected_id)
     except ValueError:
@@ -332,7 +346,8 @@ def execute_delete(message, selected_id):
         entry = cursor.fetchone()
         selected_type = entry[0]
         selected_comment = entry[1]
-
+        if selected_comment == None:
+            selected_comment = ''
         cursor.execute(f"DELETE FROM bus_id WHERE id = ?", (selected_id,))
         connect.commit()
         send_deleted_notification(selected_id, selected_type, selected_comment, message.from_user.username)
@@ -355,7 +370,7 @@ def send_deleted_notification(gid, gtype, gcomment, username):
 #Функция вывода id пользователя
 @bot.message_handler(commands=['id'])
 def print_user_id(message):
-    bot.send_message(message.chat.id, f'Твой ID пользователя: <code>{message.from_user.id}</code>', parse_mode='html')
+    bot.send_message(message.chat.id, f'Твой ID: <code>{message.from_user.id}</code>', parse_mode='html')
 
 
 #Функция распознавания введённого текста
