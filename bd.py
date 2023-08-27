@@ -8,6 +8,7 @@ from config import allowed_users
 bot = telebot.TeleBot(Token())
 while True:
     try:
+        #Приветственная функция
         @bot.message_handler(commands=['start', 'help'])
         def start(message):
             if message.from_user.id not in allowed_users():
@@ -21,6 +22,7 @@ while True:
             bot.send_message(message.chat.id, f'Привет, <b>{message.from_user.full_name}</b> 👋\n\nНажми кнопку внизу или введи гаражный номер', parse_mode='html', reply_markup=kb)
             print(message.chat.id)
 
+
         @bot.message_handler(commands=['i<3u'])
         def ilu(message):
             if message.from_user.id not in allowed_users():
@@ -28,7 +30,7 @@ while True:
                return
             love()
 
-        
+        #Функция поиска
         @bot.message_handler(commands=['search'])
         def gid_request(message):
             bot.send_message(message.chat.id, 'Введи гаражный номер для поиска')
@@ -56,54 +58,89 @@ while True:
                 bot.send_message(message.chat.id, f'<b>Гаражный номер:</b> {poisk}\n<b>Тип:</b> {tip}\n<b>Комментарий:</b> {comm}', parse_mode='html')
                 connect.commit()
 
+        #Функция добавления записи
         @bot.message_handler(commands=['add'])
         def add(message):
             if message.from_user.id not in allowed_users():
-               bot.send_message(message.chat.id, 'Unauthorized access')
-               return
+                bot.send_message(message.chat.id, 'Unauthorized access')
+                return
             kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
             cancel = types.KeyboardButton(text="Отмена")
             kb.add(cancel)
-            bot.send_message(message.chat.id, f'Через пробел введи гаражный номер, тип и комментарий\n\nПример: 666 Лиаз Какой-нибудь комментарий', parse_mode='html', reply_markup=kb)
-            bot.register_next_step_handler(message, check_gid)
-        
-        def check_gid(message):
-            added_id = message.text.lower()
-            if added_id == 'отмена':
-                start(message)
-            else:
-                sp = message.text.split(' ')
-                if sp[0].isdigit():
-                    gid = int(sp[0])
-                    if len(sp) >= 2:
-                        gtype = sp[1]
-                    else: 
-                        bot.send_message(message.chat.id, 'Без типа создать запись нельзя\n\nВведи /add для добавления новой записи')
-                        start(message)
-                    if len(sp) >= 3:
-                        gcomment = ' '.join(sp[2:])
-                    else:
-                        gcomment = ''
+            bot.send_message(message.chat.id, 'Введи гаражный номер для добавления', reply_markup=kb)
+            bot.register_next_step_handler(message, add_type)
+
+        def add_type(message, gid=None):
+            if gid is None:
+                if message.text.lower() == 'отмена':
+                    start(message)
+                    return
+                if message.text.isdigit():
+                    gid = int(message.text)
                     connect = sqlite3.connect('ts.db')
                     cursor = connect.cursor()
                     cursor.execute(f"SELECT EXISTS(SELECT * FROM bus_id where id = {gid})")
                     if cursor.fetchone()[0] == 1:
-                        bot.send_message(message.chat.id, f'Гаражный номер <b>{gid}</b> уже есть в БД', parse_mode='html')
+                        cursor.execute(f"SELECT type, comment FROM bus_id WHERE id = {gid}")
+                        entry = cursor.fetchone()
+                        gtype = entry[0]
+                        gcomment = entry[1]
+                        bot.send_message(message.chat.id, f'Гаражный номер <b>{gid}</b> уже есть в БД\n\n<b>Гаражный номер:</b> {gid}\n<b>Тип:</b> {gtype}\n<b>Комментарий:</b> {gcomment}', parse_mode='html')
                         start(message)
-                    else:
-                        sp = (gid, gtype, gcomment)
-                        cursor.execute(f"INSERT INTO bus_id VALUES (?, ?, ?)", sp)
-                        connect.commit()
-                        bot.send_message('-805417506', f'Добавлена запись: {gid}; {gtype}; {gcomment}\n@{message.from_user.username}')
-                        show_added_entry(message, gid, gtype, gcomment)
+                        return
+                    kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+                    back = types.KeyboardButton(text="Назад")
+                    cancel = types.KeyboardButton(text="Отмена")
+                    kb.add(back, cancel)
+                    bot.send_message(message.chat.id, f'<b>Гаражный номер:</b> {gid}\n\nВведи тип', parse_mode='html', reply_markup=kb)
+                    bot.register_next_step_handler(message, add_comment, gid=gid)
                 else:
-                    bot.send_message(message.chat.id, f'Ты ввёл некорректный гаражный номер')
-                    start(message)
+                    bot.send_message(message.chat.id, 'Некорректный гаражный номер')
+                    add(message)
+            else:
+                kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+                back = types.KeyboardButton(text="Назад")
+                cancel = types.KeyboardButton(text="Отмена")
+                kb.add(back, cancel)
+                bot.send_message(message.chat.id, f'<b>Гаражный номер:</b> {gid}\n\nВведи тип', parse_mode='html', reply_markup=kb)
+                bot.register_next_step_handler(message, add_comment, gid=gid)
+
+        def add_comment(message, gid):
+            if message.text.lower() == 'назад':
+                add(message)
+            elif message.text.lower() == 'отмена':
+                start(message)
+            else:
+                gtype = message.text
+                kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+                back = types.KeyboardButton(text="Назад")
+                skip = types.KeyboardButton(text="Пропустить")
+                cancel = types.KeyboardButton(text="Отмена")
+                kb.add(skip, back, cancel)
+                bot.send_message(message.chat.id, f'<b>Гаражный номер:</b> {gid}\n<b>Тип:</b> {gtype}\n\nВведи комментарий или нажми "Пропустить"', parse_mode='html', reply_markup=kb)
+                bot.register_next_step_handler(message, save_entry, gid=gid, gtype=gtype)
+
+        def save_entry(message, gid, gtype):
+            if message.text.lower() == 'назад':
+                add_type(message, gid)
+            elif message.text.lower() == 'отмена':
+                start(message)
+            else:
+                gcomment = message.text
+                if message.text.lower() == 'пропустить':
+                    gcomment = ''
+                connect = sqlite3.connect('ts.db')
+                cursor = connect.cursor()
+                cursor.execute("INSERT INTO bus_id VALUES (?, ?, ?)", (gid, gtype, gcomment))
+                connect.commit()
+                bot.send_message('-805417506', f'Добавлена запись: {gid}; {gtype}; {gcomment}\n@{message.from_user.username}')
+                show_added_entry(message, gid, gtype, gcomment)
 
         def show_added_entry(message, gid, gtype, gcomment):
-            bot.send_message(message.chat.id, f'<b>Добавленная запись</b>\n\n<b>Гаражный номер:</b> {gid}\n<b>Тип:</b> {gtype}\n<b>Комментарий:</b> {gcomment}', parse_mode='html')
+            bot.send_message(message.chat.id, f'Запись успешно добавлена\n\n<b>Гаражный номер:</b> {gid}\n<b>Тип:</b> {gtype}\n<b>Комментарий:</b> {gcomment}', parse_mode='html')
             start(message)
 
+        #Функция редактирования записи
         @bot.message_handler(commands=['edit'])
         def edit(message):
             if message.from_user.id not in allowed_users():
@@ -197,7 +234,7 @@ while True:
 
             bot.send_message(message.chat.id, f'<b>Обновленная запись</b>\n\n<b>Гаражный номер:</b> {gid}\n<b>Тип:</b> {updated_type}\n<b>Комментарий:</b> {updated_comment}', parse_mode='html')
 
-
+        #Функция удаления записи
         @bot.message_handler(commands=['delete'])
         def delete(message):
             if message.from_user.id not in allowed_users():
@@ -254,11 +291,12 @@ while True:
             else:
                 start(message)
 
-
+        #Функция вывода id пользователя
         @bot.message_handler(commands=['id'])
         def print_user_id(message):
             bot.send_message(message.chat.id, f'{message.from_user.id}')
 
+        #Функция распознавания введённого текста
         @bot.message_handler(content_types=['text'])
         def text(message):
             if message.from_user.id not in allowed_users():
