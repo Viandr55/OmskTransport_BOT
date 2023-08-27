@@ -8,17 +8,17 @@ from config import allowed_users
 bot = telebot.TeleBot(Token())
 while True:
     try:
-        #Приветственная функция
+        #Стартовая функция
         @bot.message_handler(commands=['start', 'help'])
         def start(message):
             if message.from_user.id not in allowed_users():
                bot.send_message(message.chat.id, 'Unauthorized access')
                return
             kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
-            btn1 = types.KeyboardButton(text="/add")
-            btn2 = types.KeyboardButton(text="/edit")
-            btn3 = types.KeyboardButton(text="/delete")
-            kb.add(btn1, btn2, btn3)
+            add = types.KeyboardButton(text="/add")
+            edit = types.KeyboardButton(text="/edit")
+            delete = types.KeyboardButton(text="/delete")
+            kb.add(add, edit, delete)
             bot.send_message(message.chat.id, f'Привет, <b>{message.from_user.full_name}</b> 👋\n\nНажми кнопку внизу или введи гаражный номер', parse_mode='html', reply_markup=kb)
             print(message.chat.id)
 
@@ -39,23 +39,23 @@ while True:
         def search(message):
             connect = sqlite3.connect('ts.db')
             cursor = connect.cursor()
-            poisk = int(message.text)
-            cursor.execute(f"SELECT EXISTS(SELECT * FROM bus_id where id = {int(poisk)})")
+            gid = int(message.text)
+            cursor.execute(f"SELECT EXISTS(SELECT * FROM bus_id where id = {int(gid)})")
             if cursor.fetchone()[0] == 0:
-                bot.send_message(message.chat.id, f'Гаражного номера <b>{poisk}</b> у меня пока нет', parse_mode='html')
+                bot.send_message(message.chat.id, f'Гаражного номера <b>{gid}</b> у меня пока нет', parse_mode='html')
                 start(message)
             else:
-                pls = cursor.execute(f"SELECT type, comment FROM bus_id WHERE id = {int(poisk)}")
-                tip = pls.fetchall()[0][0]
-                pls = cursor.execute(f"SELECT type, comment FROM bus_id WHERE id = {int(poisk)}")
-                comm = pls.fetchall()[0][1]
+                cursor.execute(f"SELECT type, comment FROM bus_id WHERE id = {int(gid)}")
+                entry = cursor.fetchone()
+                gtype = entry[0]
+                gcomment = entry[1]
 
-                if tip is None:
-                    tip = ''
-                if comm is None:
-                    comm = ''
+                if gtype is None:
+                    gtype = ''
+                if gcomment is None:
+                    gcomment = ''
                 
-                bot.send_message(message.chat.id, f'<b>Гаражный номер:</b> {poisk}\n<b>Тип:</b> {tip}\n<b>Комментарий:</b> {comm}', parse_mode='html')
+                bot.send_message(message.chat.id, f'<b>Гаражный номер:</b> {gid}\n<b>Тип:</b> {gtype}\n<b>Комментарий:</b> {gcomment}', parse_mode='html')
                 connect.commit()
 
         #Функция добавления записи
@@ -307,7 +307,6 @@ while True:
             else:
                 bot.send_message(message.chat.id, 'Я не знаю что ты ввел')
                 start(message)
-
         
         bot.polling(none_stop=True, interval=0)
     except:
