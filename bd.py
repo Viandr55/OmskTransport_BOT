@@ -141,12 +141,20 @@ while True:
                 cursor = connect.cursor()
                 cursor.execute("INSERT INTO bus_id VALUES (?, ?, ?)", (gid, gtype, gcomment))
                 connect.commit()
-                bot.send_message('-805417506', f'Добавлена запись: {gid}; {gtype}; {gcomment}\n@{message.from_user.username}')
+                send_added_notification(gid, gtype, gcomment, message.from_user.username)
                 show_added_entry(message, gid, gtype, gcomment)
 
         def show_added_entry(message, gid, gtype, gcomment):
-            bot.send_message(message.chat.id, f'Запись успешно добавлена\n\n<b>Гаражный номер:</b> {gid}\n<b>Тип:</b> {gtype}\n<b>Комментарий:</b> {gcomment}', parse_mode='html')
+            bot.send_message(message.chat.id, f'Добавленная запись\n\n<b>Гаражный номер:</b> {gid}\n<b>Тип:</b> {gtype}\n<b>Комментарий:</b> {gcomment}', parse_mode='html')
             start(message)
+
+        def send_added_notification(gid, gtype, gcomment, username):
+            notification_text = f"➕ Добавление записи ➕\n\n" \
+                                f"Гаражный номер: {gid}\n" \
+                                f"Тип: {gtype}\n" \
+                                f"Комментарий: {gcomment}\n" \
+                                f"Пользователь: @{username}"
+            bot.send_message('-805417506', notification_text)
 
 
         #Функция редактирования записи
@@ -216,7 +224,6 @@ while True:
 
         def update_field(message, gid, field_name):
             new_value = message.text
-
             if new_value.lower() == 'назад':
                 kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
                 btn1 = types.KeyboardButton(text="Тип")
@@ -228,8 +235,11 @@ while True:
             else:
                 connect = sqlite3.connect('ts.db')
                 cursor = connect.cursor()
+                cursor.execute(f"SELECT {field_name} FROM bus_id WHERE id = ?", (gid,))
+                previous_value = cursor.fetchone()[0]
                 cursor.execute(f"UPDATE bus_id SET {field_name} = ? WHERE id = ?", (new_value, gid))
                 connect.commit()
+                send_edit_notification(gid, field_name, previous_value, new_value, message.from_user.username)
                 show_updated_entry(message, gid)
                 start(message)
 
@@ -241,7 +251,17 @@ while True:
             updated_type = entry[0]
             updated_comment = entry[1]
 
-            bot.send_message(message.chat.id, f'<b>Обновленная запись</b>\n\n<b>Гаражный номер:</b> {gid}\n<b>Тип:</b> {updated_type}\n<b>Комментарий:</b> {updated_comment}', parse_mode='html')
+            bot.send_message(message.chat.id, f'<b>Измененная запись</b>\n\n<b>Гаражный номер:</b> {gid}\n<b>Тип:</b> {updated_type}\n<b>Комментарий:</b> {updated_comment}', parse_mode='html')
+
+        def send_edit_notification(gid, field_name, previous_value, new_value, username):
+            notification_text = f"🔧 Изменение записи 🔧\n\n" \
+                                f"Гаражный номер: {gid}\n" \
+                                f"Поле: {field_name}\n" \
+                                f"Старое значение: {previous_value}\n" \
+                                f"Новое значение: {new_value}\n" \
+                                f"Пользователь: @{username}"
+            bot.send_message('-805417506', notification_text)
+
 
 
         #Функция удаления записи
@@ -293,13 +313,21 @@ while True:
 
                 cursor.execute(f"DELETE FROM bus_id WHERE id = ?", (selected_id,))
                 connect.commit()
-                bot.send_message('-805417506', f'Удалена запись: {selected_id}; {selected_type}; {selected_comment}\n@{message.from_user.username}')
-                bot.send_message(message.chat.id, f'Гаражный номер <b>{selected_id}</b> успешно удален', parse_mode='html')
+                send_deleted_notification(selected_id, selected_type, selected_comment, message.from_user.username)
+                bot.send_message(message.chat.id, f'Удаленная запись\n\n<b>Гаражный номер:</b> {selected_id}\n<b>Тип:</b> {selected_type}\n<b>Комментарий:</b> {selected_comment} ', parse_mode='html')
                 start(message)
             elif message.text.lower() == 'назад':
                 delete(message)
             else:
                 start(message)
+
+        def send_deleted_notification(gid, gtype, gcomment, username):
+            notification_text = f"➖ Удаление записи ➖\n\n" \
+                                f"Гаражный номер: {gid}\n" \
+                                f"Тип: {gtype}\n" \
+                                f"Комментарий: {gcomment}\n" \
+                                f"Пользователь: @{username}"
+            bot.send_message('-805417506', notification_text)
 
 
         #Функция вывода id пользователя
@@ -320,7 +348,7 @@ while True:
                 bot.send_message(message.chat.id, 'Я не знаю что ты ввел')
                 start(message)
         
-        
+
         bot.polling(none_stop=True, interval=0)
     except:
         bot.stop_polling()
