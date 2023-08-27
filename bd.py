@@ -22,13 +22,13 @@ while True:
             bot.send_message(message.chat.id, f'Привет, <b>{message.from_user.full_name}</b> 👋\n\nНажми кнопку внизу или введи гаражный номер', parse_mode='html', reply_markup=kb)
             print(message.chat.id)
 
-
         @bot.message_handler(commands=['i<3u'])
         def ilu(message):
             if message.from_user.id not in allowed_users():
                bot.send_message(message.chat.id, 'Unauthorized access')
                return
             love()
+
 
         #Функция поиска
         @bot.message_handler(commands=['search'])
@@ -64,6 +64,7 @@ while True:
         def handle_add_callback(call):
             gid = call.data.split("_")[1]
             add_type(call.message, gid)
+
 
         #Функция добавления записи
         @bot.message_handler(commands=['add'])
@@ -146,6 +147,7 @@ while True:
         def show_added_entry(message, gid, gtype, gcomment):
             bot.send_message(message.chat.id, f'Запись успешно добавлена\n\n<b>Гаражный номер:</b> {gid}\n<b>Тип:</b> {gtype}\n<b>Комментарий:</b> {gcomment}', parse_mode='html')
             start(message)
+
 
         #Функция редактирования записи
         @bot.message_handler(commands=['edit'])
@@ -241,6 +243,7 @@ while True:
 
             bot.send_message(message.chat.id, f'<b>Обновленная запись</b>\n\n<b>Гаражный номер:</b> {gid}\n<b>Тип:</b> {updated_type}\n<b>Комментарий:</b> {updated_comment}', parse_mode='html')
 
+
         #Функция удаления записи
         @bot.message_handler(commands=['delete'])
         def delete(message):
@@ -298,10 +301,12 @@ while True:
             else:
                 start(message)
 
+
         #Функция вывода id пользователя
         @bot.message_handler(commands=['id'])
         def print_user_id(message):
             bot.send_message(message.chat.id, f'{message.from_user.id}')
+
 
         #Функция распознавания введённого текста
         @bot.message_handler(content_types=['text'])
@@ -314,6 +319,7 @@ while True:
             else:
                 bot.send_message(message.chat.id, 'Я не знаю что ты ввел')
                 start(message)
+        
         
         bot.polling(none_stop=True, interval=0)
     except:
