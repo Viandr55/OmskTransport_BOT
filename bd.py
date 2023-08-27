@@ -57,12 +57,8 @@ def search(message):
         entry = cursor.fetchone()
         gtype = entry[0]
         gcomment = entry[1]
-
-        if gtype is None:
-            gtype = ''
         if gcomment is None:
             gcomment = ''
-        
         bot.send_message(message.chat.id, f'<b>Гаражный номер:</b> {gid}\n<b>Тип:</b> {gtype}\n<b>Комментарий:</b> {gcomment}', parse_mode='html')
         connect.commit()
 
