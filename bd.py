@@ -12,7 +12,7 @@ def check_access(user_id):
 
 
 #Стартовая функция
-@bot.message_handler(commands=['start', 'help'])
+@bot.message_handler(commands=['start'])
 def start(message):
     user_id = message.from_user.id
     if not check_access(user_id):
@@ -40,6 +40,18 @@ def start(message):
     kb.add(add, edit, delete)
     bot.send_message(message.chat.id, f'Привет, <b>{message.from_user.full_name}</b> 👋\n\nНажми кнопочку снизу или введи гаражный номер', parse_mode='html', reply_markup=kb)
     print("https://t.me/"+message.from_user.username)
+
+#Функция помощи
+@bot.message_handler(commands=['help'])
+def help(message):
+    bot.send_message(message.chat.id, \
+                     '/start - перезапуск бота\n\
+/add - добавить запись\n\
+/edit - редактирование записи\n\
+/delete - удаление записи\n\
+/id - узнать свой id\n\
+/style - изменить стиль кнопок\n\
+/help - вывод этой справки')
 
 @bot.message_handler(commands=['i<3u'])
 def ilu(message):
@@ -408,7 +420,7 @@ def change_button_style(message):
     new_button_style = 1 - user_button_style #Смена между 0 и 1
     cursor.execute("INSERT OR REPLACE INTO user_settings (user_id, button_style) VALUES (?, ?)", (user_id, new_button_style))
     connect.commit()
-    bot.send_message(message.chat.id, f'Стиль кнопок успешно изменен!')
+    bot.send_message(message.chat.id, f'Стиль кнопок успешно изменен')
     start(message)
 
 
