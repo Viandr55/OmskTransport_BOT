@@ -2,7 +2,7 @@ import telebot
 import sqlite3
 from telebot import types
 from config import Token, love, allowed_users
-import re
+import json
 
 bot = telebot.TeleBot(Token())
 
@@ -14,14 +14,29 @@ def check_access(user_id):
 #Стартовая функция
 @bot.message_handler(commands=['start', 'help'])
 def start(message):
-    if not check_access(message.from_user.id):
+    user_id = message.from_user.id
+    if not check_access(user_id):
         print("https://t.me/"+message.from_user.username)
         bot.send_message(message.chat.id, 'Unauthorized access')
         return
+    connect = sqlite3.connect('ts.db')
+    cursor = connect.cursor()
+    cursor.execute(f"SELECT button_style FROM user_settings WHERE user_id = ?", (user_id,))
+    user_button_style = cursor.fetchone()
+    if user_button_style is None:
+        user_button_style = 0
+    else:
+        user_button_style = user_button_style[0]
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
-    add = types.KeyboardButton(text="Добавить")
-    edit = types.KeyboardButton(text="Редактировать")
-    delete = types.KeyboardButton(text="Удалить")
+    if user_button_style == 0:
+        add = types.KeyboardButton(text="Добавить")
+        edit = types.KeyboardButton(text="Редактировать")
+        delete = types.KeyboardButton(text="Удалить")
+    else:
+        add = types.KeyboardButton(text="/add")
+        edit = types.KeyboardButton(text="/edit")
+        delete = types.KeyboardButton(text="/delete")
+
     kb.add(add, edit, delete)
     bot.send_message(message.chat.id, f'Привет, <b>{message.from_user.full_name}</b> 👋\n\nНажми кнопочку снизу или введи гаражный номер', parse_mode='html', reply_markup=kb)
     print("https://t.me/"+message.from_user.username)
@@ -371,6 +386,30 @@ def send_deleted_notification(gid, gtype, gcomment, username):
 @bot.message_handler(commands=['id'])
 def print_user_id(message):
     bot.send_message(message.chat.id, f'Твой ID: <code>{message.from_user.id}</code>', parse_mode='html')
+
+
+#Функция изменения стиля кнопок
+@bot.message_handler(commands=['style'])
+def change_button_style(message):
+    user_id = message.from_user.id
+    if not check_access(user_id):
+        bot.send_message(message.chat.id, 'Unauthorized access')
+        return
+    connect = sqlite3.connect('ts.db')
+    cursor = connect.cursor()
+    #Получение стиля кнопок из БД
+    cursor.execute(f"SELECT button_style FROM user_settings WHERE user_id = ?", (user_id,))
+    user_button_style = cursor.fetchone()
+    if user_button_style is None:
+        user_button_style = 0
+    else:
+        user_button_style = user_button_style[0]
+    #Переключение стиля кнопок и обновление настроек в базе данных
+    new_button_style = 1 - user_button_style #Смена между 0 и 1
+    cursor.execute("INSERT OR REPLACE INTO user_settings (user_id, button_style) VALUES (?, ?)", (user_id, new_button_style))
+    connect.commit()
+    bot.send_message(message.chat.id, f'Стиль кнопок успешно изменен!')
+    start(message)
 
 
 #Функция распознавания введённого текста
