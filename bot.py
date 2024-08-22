@@ -1,25 +1,36 @@
 import telebot
 import sqlite3
+import os
+import logging
 from telebot import types
-from config import Token, love, allowed_users
-import json
 
-bot = telebot.TeleBot(Token())
+# Логирование
+logging.basicConfig(
+    level=logging.INFO,  # Уровень логирования
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',  # Формат сообщения
+    handlers=[
+        logging.StreamHandler()  # Обработчик для вывода в стандартный поток вывода (stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
 
-#Функция проверки доступа пользователя
+bot = telebot.TeleBot(os.getenv('TELEGRAM_TOKEN'))
+
+DATABASE_PATH = os.getenv('DATABASE_PATH', './data/ts.db')
+
+# Функция проверки доступа пользователя
 def check_access(user_id):
-    return user_id in allowed_users()
+    return user_id in set(map(int, os.getenv('ALLOWED_USERS', '').split(',')))
 
-
-#Стартовая функция
+# Стартовая функция
 @bot.message_handler(commands=['start'])
 def start(message):
     user_id = message.from_user.id
     if not check_access(user_id):
-        print("https://t.me/"+message.from_user.username)
+        logger.warning(f"Unauthorized access https://t.me/{message.from_user.username}")
         bot.send_message(message.chat.id, 'Unauthorized access')
         return
-    connect = sqlite3.connect('ts.db')
+    connect = sqlite3.connect(DATABASE_PATH)
     cursor = connect.cursor()
     cursor.execute(f"SELECT button_style FROM user_settings WHERE user_id = ?", (user_id,))
     user_button_style = cursor.fetchone()
@@ -39,7 +50,7 @@ def start(message):
 
     kb.add(add, edit, delete)
     bot.send_message(message.chat.id, f'Привет, <b>{message.from_user.full_name}</b> 👋\n\nНажми кнопочку снизу или введи гаражный номер', parse_mode='html', reply_markup=kb)
-    print("https://t.me/"+message.from_user.username)
+    logger.info(f"Authorized access https://t.me/{message.from_user.username}")
 
 #Функция помощи
 @bot.message_handler(commands=['help'])
@@ -53,12 +64,12 @@ def help(message):
 /style - изменить стиль кнопок\n\
 /help - вывод этой справки')
 
-@bot.message_handler(commands=['i<3u'])
-def ilu(message):
+@bot.message_handler(commands=['target'])
+def targetmsg(message):
     if not check_access(message.from_user.id):
         bot.send_message(message.chat.id, 'Unauthorized access')
         return
-    love()
+    bot.send_message(os.getenv('TARGET_ID'), os.getenv('TARGET_TEXT'), parse_mode='html')
 
 
 #Функция поиска
@@ -71,7 +82,7 @@ def gid_request(message):
     bot.register_next_step_handler(message, search)
 
 def search(message):
-    connect = sqlite3.connect('ts.db')
+    connect = sqlite3.connect(DATABASE_PATH)
     cursor = connect.cursor()
     gid = int(message.text)
     cursor.execute(f"SELECT EXISTS(SELECT * FROM bus_id where id = {int(gid)})")
@@ -133,7 +144,7 @@ def add_type(message, gid=None):
             return
         if message.text.isdigit():
             gid = int(message.text)
-            connect = sqlite3.connect('ts.db')
+            connect = sqlite3.connect(DATABASE_PATH)
             cursor = connect.cursor()
             cursor.execute(f"SELECT EXISTS(SELECT * FROM bus_id where id = {gid})")
             if cursor.fetchone()[0] == 1:
@@ -187,7 +198,7 @@ def save_entry(message, gid, gtype):
         gcomment = message.text
         if message.text.lower() == 'пропустить':
             gcomment = ''
-        connect = sqlite3.connect('ts.db')
+        connect = sqlite3.connect(DATABASE_PATH)
         cursor = connect.cursor()
         cursor.execute("INSERT INTO bus_id VALUES (?, ?, ?)", (gid, gtype, gcomment))
         connect.commit()
@@ -229,7 +240,7 @@ def select_entry_to_edit(message, selected_id=None):
         if selected_id == 'отмена':
             start(message)
         else:
-            connect = sqlite3.connect('ts.db')
+            connect = sqlite3.connect(DATABASE_PATH)
             cursor = connect.cursor()
             cursor.execute(f"SELECT * FROM bus_id where id = {selected_id}")
             entry = cursor.fetchone()
@@ -267,7 +278,7 @@ def edit_field(message, gid):
         select_entry_to_edit(message, gid)
 
 def show_current_value_and_request_new_value(message, gid, field_name, field_display_name):
-    connect = sqlite3.connect('ts.db')
+    connect = sqlite3.connect(DATABASE_PATH)
     cursor = connect.cursor()
     cursor.execute(f"SELECT {field_name} FROM bus_id WHERE id = {gid}")
     current_value = cursor.fetchone()[0]
@@ -290,7 +301,7 @@ def update_field(message, gid, field_name):
     elif new_value.lower() == 'отмена':
         start(message)
     else:
-        connect = sqlite3.connect('ts.db')
+        connect = sqlite3.connect(DATABASE_PATH)
         cursor = connect.cursor()
         cursor.execute(f"SELECT {field_name} FROM bus_id WHERE id = ?", (gid,))
         previous_value = cursor.fetchone()[0]
@@ -301,7 +312,7 @@ def update_field(message, gid, field_name):
         start(message)
 
 def show_updated_entry(message, gid):
-    connect = sqlite3.connect('ts.db')
+    connect = sqlite3.connect(DATABASE_PATH)
     cursor = connect.cursor()
     cursor.execute(f"SELECT type, comment FROM bus_id WHERE id = {gid}")
     entry = cursor.fetchone()
@@ -343,7 +354,7 @@ def confirm_delete(message, selected_id=None):
                 selected_id = int(message.text)
             else:
                 selected_id = selected_id
-            connect = sqlite3.connect('ts.db')
+            connect = sqlite3.connect(DATABASE_PATH)
             cursor = connect.cursor()
             cursor.execute(f"SELECT * FROM bus_id where id = {selected_id}")
             entry = cursor.fetchone()
@@ -367,7 +378,7 @@ def confirm_delete(message, selected_id=None):
 
 def execute_delete(message, selected_id):
     if message.text.lower() == 'удалить':
-        connect = sqlite3.connect('ts.db')
+        connect = sqlite3.connect(DATABASE_PATH)
         cursor = connect.cursor()
         cursor.execute(f"SELECT type, comment FROM bus_id WHERE id = {selected_id}")
         entry = cursor.fetchone()
@@ -407,7 +418,7 @@ def change_button_style(message):
     if not check_access(user_id):
         bot.send_message(message.chat.id, 'Unauthorized access')
         return
-    connect = sqlite3.connect('ts.db')
+    connect = sqlite3.connect(DATABASE_PATH)
     cursor = connect.cursor()
     #Получение стиля кнопок из БД
     cursor.execute(f"SELECT button_style FROM user_settings WHERE user_id = ?", (user_id,))
@@ -442,8 +453,9 @@ def main():
         try:
             bot.polling(none_stop=True, interval=0)
         except Exception as e:
-            print("Error:", e)
+            logger.error("Error:", e)
             bot.stop_polling()
             
 if __name__ == "__main__":
+    logger.info("Bot started")
     main()

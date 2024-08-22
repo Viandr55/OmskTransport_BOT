@@ -1,7 +1,4 @@
-
-config.py
 __pycache__/
 help
 .vscode/
-bd.py_bckp
-ts.db.backup
+.env
